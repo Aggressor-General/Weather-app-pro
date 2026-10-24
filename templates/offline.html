@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Offline - Weather App Pro</title>
+    <meta name="theme-color" content="#2563eb">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="app offline">
+    <h1>You're offline</h1>
+    <p class="muted">Weather Pro needs an internet connection to load weather and AI answers. Check your connection and try again.</p>
+    <button type="button" onclick="window.location.href = '/'">Try again</button>
+</main>
+</body>
+</html>

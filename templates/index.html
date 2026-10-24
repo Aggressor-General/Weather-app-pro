@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Weather App Pro</title>
+
+    <!-- PWA: installable app -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Weather Pro">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='icons/icon-32.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<main class="app">
+
+    <header class="top">
+        <h1>Weather App Pro</h1>
+        <button type="button" id="install-btn" class="small-btn" hidden>Install app</button>
+    </header>
+
+    <form class="search" method="GET" action="/">
+        <label class="visually-hidden" for="city">City</label>
+        <input id="city" type="search" name="city" placeholder="Search any city" required
+               autocomplete="off" value="{{ request.values.get('city', '') }}">
+        <button type="submit">Search</button>
+    </form>
+
+    {% if error %}
+        <div class="error" role="alert">{{ error }}</div>
+    {% endif %}
+
+    {% if weather %}
+
+    <!-- Current weather -->
+    <section class="now">
+        <h2>{{ weather.city }}{% if weather.country %}, {{ weather.country }}{% endif %}</h2>
+        <div class="now-main">
+            <span class="now-icon">{{ weather.icon }}</span>
+            <span class="now-temp">{{ weather.temp }}°C</span>
+        </div>
+        <p class="now-desc">{{ weather.desc }}</p>
+        <p class="muted">
+            {% if weather.feels_like is not none %}Feels like {{ weather.feels_like }}°C · {% endif %}
+            Humidity {{ weather.humidity }}% · Wind {{ weather.wind }} {{ weather.wind_unit }} {{ weather.wind_dir }}
+        </p>
+    </section>
+
+    <!-- AI assistant: briefing, chat and planner -->
+    <section class="card ai-panel" id="ai-panel"
+             data-name="{{ weather.city }}" data-country="{{ weather.country }}"
+             data-lat="{{ weather.lat }}" data-lon="{{ weather.lon }}">
+        <h2>Ask AI</h2>
+
+        <div class="briefing">
+            <p id="briefing-text" class="muted">Get a short AI summary of the next 24 hours.</p>
+            <button type="button" class="link-btn" id="briefing-btn">Get today's briefing</button>
+        </div>
+
+        <div class="chips">
+            <button type="button" class="chip" data-q="What should I wear today?">What should I wear?</button>
+            <button type="button" class="chip" data-q="When is it most likely to rain this week?">When will it rain?</button>
+            <button type="button" class="chip" data-q="What is the best day this week to be outdoors?">Best day outdoors?</button>
+        </div>
+
+        <div id="chat-log" class="chat-log" aria-live="polite"></div>
+
+        <form id="chat-form" class="row-form">
+            <label class="visually-hidden" for="chat-input">Your question</label>
+            <input id="chat-input" type="text" maxlength="400" autocomplete="off"
+                   placeholder="Is Saturday afternoon good for an outdoor event?">
+            <button id="chat-send" type="submit">Ask</button>
+        </form>
+
+        <details class="plan">
+            <summary>Plan an activity</summary>
+            <form id="plan-form" class="row-form">
+                <label class="visually-hidden" for="plan-activity">Activity</label>
+                <select id="plan-activity">
+                    <option>Running</option>
+                    <option>Outdoor event</option>
+                    <option>Delivery or transport</option>
+                    <option>Farm work</option>
+                    <option>Drying laundry</option>
+                    <option>Travel</option>
+                </select>
+                <button id="plan-send" type="submit">Find best time</button>
+            </form>
+            <div id="plan-result" class="plan-result" aria-live="polite"></div>
+        </details>
+
+        <p class="note">AI answers use the forecast shown here. For severe weather, follow your local meteorological agency.</p>
+    </section>
+
+    <!-- Next 24 hours -->
+    <section class="card">
+        <h2>Next 24 hours</h2>
+        <div class="hourly-strip">
+            {% for h in weather.hourly %}
+            <div class="hour-card">
+                <div class="hour">{{ h.hour }}</div>
+                <div class="icon">{{ h.icon }}</div>
+                <div class="temp">{{ h.temp }}°</div>
+                <div class="rain">{{ h.rain_chance }}%</div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- 5-day forecast -->
+    <section class="card">
+        <h2>5-day forecast</h2>
+        <ul class="days">
+            {% for day in weather.forecast %}
+            <li>
+                <span class="day-name">{{ day.label }}</span>
+                <span class="day-icon" title="{{ day.desc }}">{{ day.icon }}</span>
+                <span class="day-rain">{{ day.rain }}%</span>
+                <span class="day-temps">{{ day.min }}° / {{ day.max }}°</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <!-- Weather to watch -->
+    {% if weather.windows %}
+    <details class="card watch">
+        <summary>Weather to watch ({{ weather.windows|length }})</summary>
+        <ul class="watch-list">
+            {% for w in weather.windows %}
+            <li>
+                <span class="watch-icon">{{ w.icon }}</span>
+                <span class="watch-text"><strong>{{ w.desc }}</strong><br>
+                    <span class="muted">{{ w.range }} · rain chance up to {{ w.max_rain }}%</span></span>
+            </li>
+            {% endfor %}
+        </ul>
+    </details>
+    {% endif %}
+
+    {% endif %}
+</main>
+
+<script src="{{ url_for('static', filename='pwa.js') }}"></script>
+{% if weather %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endif %}
+</body>
+</html>
