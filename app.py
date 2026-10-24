@@ -31,6 +31,7 @@ chat_limiter = UsageLimiter(
     per_day=int(os.getenv("AI_LIMIT_PER_DAY", ai.DEFAULT_VISITOR_PER_DAY)),
 )
 briefing_limiter = UsageLimiter(per_minute=3, per_day=8)
+status_limiter = UsageLimiter(per_minute=5, per_day=60)
 
 # Only show windows for notable weather (skip plain clear/cloudy stretches)
 SKIP_DESCRIPTIONS = {"Clear sky", "Mainly clear", "Partly cloudy", "Overcast"}
@@ -110,6 +111,15 @@ def service_worker():
 @app.get("/offline")
 def offline():
     return render_template("offline.html")
+
+
+@app.get("/status")
+def status():
+    """Health check: can this server reach the weather service, and is AI configured?
+    Open /status on your live site when something is wrong. It never shows secret keys."""
+    if not status_limiter.allow(request.remote_addr):
+        return jsonify({"error": "Too many requests."}), 429
+    return jsonify({"weather_service": wx.check_providers(), "ai": ai.describe_config()})
 
 
 # ---------------------------------------------------------------------------

@@ -96,6 +96,16 @@ Each AI request logs which model actually answered (`ai_response ... served_mode
 
 Keep `--workers 1`: the cache and rate limiters live in memory, so extra workers would each keep their own copy.
 
+## Troubleshooting a live site
+
+Open `/status` on your site (for example `https://your-app.onrender.com/status`). It shows whether the server can reach the weather service and whether AI is configured. It never shows secret keys.
+
+- `"http_status": 429` for the weather service means Open-Meteo is limiting this server's IP address. The free service shares limits per IP, and hosting providers share IPs between many apps. Wait and retry, or use a paid or alternative weather provider.
+- `"http_status": null` with `Timeout` or `ConnectionError` means the server could not reach the weather service at all. Check Render's status page and logs.
+- `"key_configured": false` means the AI key variable is missing in Render's Environment tab.
+
+Render's **Logs** tab shows the same errors (lines starting with "Weather request failed" or "Weather provider returned").
+
 ## Before you sell it
 
 - Open-Meteo's free tier is for non-commercial use; a paid product needs a commercial weather plan or another provider.

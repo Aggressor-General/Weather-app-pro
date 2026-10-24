@@ -426,3 +426,9 @@ def _validate_plan(data):
         "windows": windows,
         "tip": str(data.get("tip", ""))[:300],
     }
+
+
+def describe_config():
+    """Non-secret AI settings for the /status page (never includes the key itself)."""
+    key_name = "OPENAI_API_KEY" if PROVIDER == "openai" else "OPENROUTER_API_KEY"
+    return {"provider": PROVIDER, "model": MODEL, "key_configured": bool(os.getenv(key_name))}

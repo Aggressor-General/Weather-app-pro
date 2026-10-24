@@ -4,6 +4,7 @@ Everything the AI assistant knows about the weather comes through this module,
 so the model never has to guess numbers.
 """
 import logging
+import time
 from datetime import datetime, timedelta
 
 import requests
@@ -24,20 +25,71 @@ _geo_cache = TTLCache(ttl_seconds=24 * 3600)
 _weather_cache = TTLCache(ttl_seconds=10 * 60)
 
 
+# Identify the app to the weather service (good API etiquette, and helps if they need to contact you).
+HEADERS = {"User-Agent": "WeatherAppPro/1.0"}
+
+
 class WeatherError(Exception):
     """The weather provider could not be reached or returned unusable data."""
 
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status
+
 
 def _get_json(url, params):
-    try:
-        response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        return response.json()
-    except (requests.RequestException, ValueError) as exc:
-        logger.warning("Weather provider request failed: %s", exc)
-        raise WeatherError(
-            "The weather service is not responding right now. Please try again in a moment."
-        ) from exc
+    """GET a JSON document, retrying once on timeouts, connection problems and server errors."""
+    for attempt in (1, 2):
+        try:
+            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT, headers=HEADERS)
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            logger.warning("Weather request failed (attempt %s): %s: %s", attempt, type(exc).__name__, exc)
+            if attempt == 1:
+                time.sleep(0.5)
+                continue
+            raise WeatherError("The weather service is not responding right now. "
+                               "Please try again in a moment.") from exc
+        except requests.RequestException as exc:
+            logger.warning("Weather request failed: %s: %s", type(exc).__name__, exc)
+            raise WeatherError("The weather service is not responding right now. "
+                               "Please try again in a moment.") from exc
+
+        if response.status_code == 429:
+            logger.warning("Weather provider returned 429 (rate limited): %s", response.text[:200])
+            raise WeatherError("The free weather service is limiting requests from this server right now. "
+                               "Please try again in a few minutes.", status=429)
+        if response.status_code >= 500 and attempt == 1:
+            logger.warning("Weather provider returned %s, retrying: %s", response.status_code, response.text[:200])
+            time.sleep(0.5)
+            continue
+        if not response.ok:
+            logger.warning("Weather provider returned %s: %s", response.status_code, response.text[:200])
+            raise WeatherError("The weather service returned an error. Please try again in a moment.",
+                               status=response.status_code)
+        try:
+            return response.json()
+        except ValueError as exc:
+            logger.warning("Weather provider returned invalid JSON: %s", response.text[:200])
+            raise WeatherError("The weather service returned unreadable data. "
+                               "Please try again in a moment.") from exc
+
+    raise WeatherError("The weather service is not responding right now. Please try again in a moment.")
+
+
+def check_providers():
+    """Quick health check used by the /status page: one tiny call to each Open-Meteo endpoint."""
+    checks = [
+        ("geocoding", GEOCODE_URL, {"name": "Lagos", "count": 1}),
+        ("forecast", FORECAST_URL, {"latitude": 6.45, "longitude": 3.39, "current": "temperature_2m"}),
+    ]
+    result = {}
+    for name, url, params in checks:
+        try:
+            r = requests.get(url, params=params, timeout=REQUEST_TIMEOUT, headers=HEADERS)
+            result[name] = {"ok": r.ok, "http_status": r.status_code, "detail": "" if r.ok else r.text[:150]}
+        except requests.RequestException as exc:
+            result[name] = {"ok": False, "http_status": None, "detail": type(exc).__name__}
+    return result
 
 
 def get_coordinates(city_name):
